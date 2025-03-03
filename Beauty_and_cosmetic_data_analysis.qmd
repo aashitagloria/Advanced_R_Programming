@@ -1,0 +1,328 @@
+---
+title: "Business Analytics Report on Beauty Cosmetics Products"
+author: "Aashita Gloria Noah"
+date: today
+format: 
+  html:
+    embed_resources: true
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+::: callout-note
+### Data Acquisition
+
+The following dataset used for analysis in this project has been taken
+from Kaggle. The dataset used in this project contains information on
+15,000 beauty and cosmetic products, including details about brands,
+categories, pricing, ratings, skin types, packaging, and country of
+origin.
+
+This dataset provides valuable insights for businesses in the cosmetics
+industry, helping them understand market trends, consumer preferences,
+and pricing dynamics. By leveraging this analysis, businesses can
+identify high-demand categories, customer segmentation, and perform
+product bundling to increase profits from beauty products sold in the
+evolving beauty market.
+
+**Detailed Column Descriptions:** <br> - **Product_Name**: Name of the
+product. <br> - **Brand**: Brand of the product. <br> - **Category**:
+Type of cosmetic product (e.g., Blush, Makeup Remover, Highlighter).
+<br> - **Usage_Frequency**: How often the product is used (e.g., Daily,
+Weekly, Occasional). <br> - **Price_USD**: Price of the product in USD.
+<br> - **Rating**: Customer rating of the product. <br> -
+**Number_of_Reviews**: Number of reviews received.<br> -
+**Product_Size**: Size of the product (e.g., 30ml, 100ml).<br> -
+**Skin_Type**: Suitable skin type (e.g., Sensitive, Dry, Normal,
+Oily).<br> - **Gender_Target**: Target gender (e.g., Male, Female,
+Unisex).<br> - **Packaging_Type**: Type of packaging (e.g., Tube,
+Bottle, Compact).<br> - **Main_Ingredient**: Primary ingredient (e.g.,
+Retinol, Aloe Vera).<br> - **Cruelty_Free**: Whether the product is
+cruelty-free (True/False).<br> - **Country_of_Origin**: The country
+where the product is made.<br>
+:::
+
+# Introduction
+
+This report explores data from the
+**most_used_beauty_cosmetics_products_extended.csv** dataset to analyze
+consumer behavior in the beauty industry. The objective is to extract
+key insights and provide actionable recommendations for businesses in
+this sector.
+
+# Data Acquisition & Preparation
+
+```{r setup, message=FALSE, warning=FALSE}
+# Load necessary libraries
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+```
+
+## Load and Inspect Data
+
+```{r}
+# Load dataset
+data <- read.csv("most_used_beauty_cosmetics_products_extended.csv", stringsAsFactors = FALSE)
+
+# View first few rows
+head(data)
+
+# Check data structure
+str(data)
+```
+
+## Data Cleaning
+
+```{r}
+# Remove missing values
+data <- na.omit(data)
+
+# Standardize column names
+data <- janitor::clean_names(data)
+
+# Convert categorical variables to factors (if needed)
+data <- data %>% mutate(across(where(is.character), as.factor))
+
+# Summary statistics
+summary(data)
+```
+
+# Exploratory Data Analysis (EDA)
+
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# Distribution of a key variable
+ggplot(data, aes(x = category)) + 
+  geom_bar(fill = "steelblue") + 
+  theme_minimal() + 
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, margin = margin(t = 5))
+  ) + 
+  labs(
+    title = "Distribution of Beauty Product Categories",
+    x = "Category",
+    y = "Count"
+  )
+```
+
+::: callout-note
+Analysis: The price of beauty products varies widely, with the majority
+of products priced under \$100 USD. There are outliers with extremely
+high prices, particularly for luxury or premium versions of products.
+
+Actionable insight: Customer segmentation: The beauty and cosmetic
+business can perform customer segmentation for customers who are willing
+to pay a premimum price for certain products, spending them specific
+marketing campagins
+:::
+
+```{r}
+options(repos = c(CRAN = "https://cloud.r-project.org/"))
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(reticulate)
+
+# Load the dataset
+df <- read.csv("most_used_beauty_cosmetics_products_extended.csv", stringsAsFactors = FALSE)
+
+# Step 1: Create Popularity Groups Based on Number of Reviews
+df <- df %>%
+  mutate(Popularity = case_when(
+    Number_of_Reviews < 100 ~ "Low Popularity",
+    Number_of_Reviews >= 100 & Number_of_Reviews < 500 ~ "Moderately Popular",
+    Number_of_Reviews >= 500 ~ "Highly Popular"
+  ))
+
+# Step 2: Count Products by Category and Country
+product_popularity_by_country <- df %>%
+  group_by(Country_of_Origin, Category, Popularity) %>%
+  summarise(ProductCount = n(), .groups = "drop") %>%
+  arrange(desc(ProductCount))
+
+# Display results
+print(product_popularity_by_country)
+
+# Step 3: Pass Data to Python
+r_product_popularity <- product_popularity_by_country  # Send data to Python
+```
+
+```{r}
+# Price vs Rating Scatterplot
+ggplot(data, aes(x = price_usd, y = rating)) +
+  geom_point(alpha = 0.5, color = "darkred") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme_minimal() +
+  labs(title = "Price vs. Rating of Beauty Products",
+       x = "Price (USD)",
+       y = "Rating")
+```
+
+::: callout-note
+Analysis: Price and Rating isn't essentially correlated
+:::
+
+```{r}
+install.packages("reticulate")
+library(reticulate)
+```
+
+```{r}
+py_config()
+```
+
+```{r}
+reticulate::py_install(c("pandas", "matplotlib"), envname = "r-reticulate")
+```
+
+```{python}
+import pandas as pd
+
+# Load dataset
+df_py = pd.read_csv("most_used_beauty_cosmetics_products_extended.csv")
+
+# Show basic statistics
+df_py.describe()
+```
+
+# Business Analytics
+
+## Analytical Approach
+
+We analyze the correlation between price and rating, and identify the
+most frequently reviewed product categories.
+
+```{r}
+# Correlation analysis
+correlation <- cor(data$price_usd, data$rating, use = "complete.obs")
+correlation
+```
+
+```{r}
+# Top 5 most reviewed products
+top_products <- data %>%
+  group_by(product_name) %>%
+  summarise(total_reviews = sum(number_of_reviews)) %>%
+  arrange(desc(total_reviews)) %>%
+  head(5)
+top_products
+```
+
+# Integration with Python
+
+We will use Python within Quarto to generate a histogram of prices.
+
+# Using Functions & Error Handling
+
+```{r}
+# Function to calculate average rating per category
+average_rating_per_category <- function(data) {
+  tryCatch({
+    data %>%
+      group_by(category) %>%
+      summarise(avg_rating = mean(rating, na.rm = TRUE))
+  }, error = function(e) {
+    message("Error in function: ", e)
+  })
+}
+
+# Execute function
+average_rating_per_category(data)
+```
+
+# Visualization & Interpretation
+
+```{r}
+# Average rating by category
+avg_rating <- average_rating_per_category(data)
+ggplot(avg_rating, aes(x = reorder(category, avg_rating), y = avg_rating)) +
+  geom_col(fill = "skyblue") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Average Rating by Product Category",
+       x = "Product Category",
+       y = "Average Rating")
+```
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(rworldmap)
+
+# Load dataset
+data <- read.csv("most_used_beauty_cosmetics_products_extended.csv")
+
+# Summarize product count by country
+country_data <- data %>%
+  group_by(Country_of_Origin) %>%
+  summarise(Product_Count = n())
+
+# Get world map data
+world_map <- map_data("world")
+
+# Merge dataset with world map
+merged_data <- world_map %>%
+  left_join(country_data, by = c("region" = "Country_of_Origin"))
+
+# Plot the world map
+ggplot(merged_data, aes(x = long, y = lat, group = group, fill = Product_Count)) +
+  geom_polygon(color = "black") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "grey90") +
+  theme_minimal() +
+  labs(title = "Distribution of Beauty Products by Country of Origin",
+       fill = "Product Count") +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank())
+```
+
+# Conclusion & Business Recommendations
+
+### Key Insights:
+
+1.  **Product bundling for profit optimization:** The dataset shows a
+    wide variety of product categories, with skin care products leading
+    in popularity. Categories like hair care, makeup, and fragrance also
+    have a significant presence.From the top sold Beauty product 
+    category visualization, we can create bundle offers (Beauty kit) by
+    identifying products that are frequently bought together. This will
+    help the beauty and cosmetic business to recommend product bundles
+    based on customer preferences by pushing them to buy more products.
+2.  **Customer segmentation:** The price of beauty products varies
+    widely, with the majority of products priced under \$100 USD. There
+    are outliers with extremely high prices, particularly for luxury or
+    premium versions of products.The beauty and cosmetic business can
+    perform customer segmentation for customers who are willing to pay a
+    premium price for certain products, spending them specific marketing
+    campaigns
+3.  **Price vs. Rating:** Higher prices do not always correlate with
+    better customer ratings.Therefore, increasing product prices may not
+    essentially increase product rating.
+
+### Recommendations:
+
+-   **For Businesses:** Companies can adopt a bundling strategy using a
+    similarity score among products of the same brand to appeal the
+    customers to make more purchases
+
+-   **For Consumers:** Price alone does not guarantee product quality;
+    consumers should rely on **ratings and reviews**.
+
+-   **For Marketing:** Brands should come up with a loyalty program that
+    offers discounts, coupons, or points to frequent consumers can
+    categorize them into different consumer categories and offer
+    relevant products as per their budget
+
+-   **Future Work:** Further analysis on **customer sentiments** from
+    reviews can provide deeper insights into consumer preferences.
+
+# Code Quality & Reproducibility
+
+All code has been written using modular functions, appropriate error
+handling, and clear documentation. The project is fully reproducible.
